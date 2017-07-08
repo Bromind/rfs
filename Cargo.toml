@@ -1,5 +1,5 @@
 [package]
-name = "rfs"
+name = "rfs_server"
 version = "0.1.0"
 authors = ["Martin Vassor <martin.vassor@epfl.ch>"]
 
