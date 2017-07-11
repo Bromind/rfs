@@ -1,0 +1,9 @@
+[package]
+name = "rfs_client"
+version = "0.1.0"
+authors = ["Martin Vassor <martin.vassor@epfl.ch>"]
+
+[dependencies]
+base64 = "0.6.0"
+log = "0.3"
+env_logger = "0.3"
