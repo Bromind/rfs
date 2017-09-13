@@ -24,20 +24,21 @@ extern crate block_cipher_trait;
 use block_cipher_trait::{BlockCipher, BlockCipherVarKey};
 
 trait Identity: Clone {
-    fn get_secret(self) -> String;
+    fn get_secret(self) -> BlowfishKey;
     fn get_name(self) -> String;
 }
 
+type BlowfishKey = Vec<u8>;
 type Challenge = Vec<u8>;
 
 #[derive(Clone)]
 struct Client {
-    pass: String,
+    pass: BlowfishKey,
     name: String,
 }
 
 impl Client {
-    fn new(n: String, p: String) -> Client {
+    fn new(n: String, p: BlowfishKey) -> Client {
         Client {name: n, pass: p}
     }
 }
@@ -46,7 +47,7 @@ impl Identity for Client {
     fn get_name(self) -> String {
         self.name
     }
-    fn get_secret(self) -> String {
+    fn get_secret(self) -> BlowfishKey {
         self.pass
     }
 }
@@ -75,7 +76,7 @@ fn main() {
 fn handle_client(mut stream: TcpStream) {
     let message = "My messa";
 
-    let bf = get_cipher();
+    let bf = get_cipher(get_config_local_key());
     let mut out_buf = GenericArray::new();
     let in_buf = GenericArray::from_slice(message.as_bytes());
     bf.encrypt_block(&in_buf, &mut out_buf);
@@ -87,20 +88,20 @@ fn handle_client(mut stream: TcpStream) {
                         + &base64::encode(&out_buf.to_vec()) 
                         + &"\n";
                     match stream.write(buf.as_bytes()){
-                        Ok(_) => println!("Message sent"),
-                        Err(e) => println!("Message not sent: {}", e),
+                        Ok(_) => info!("Message sent"),
+                        Err(e) => warn!("Message not sent: {}", e),
                     }
                 },
                 None => {
-                    println!("Authentication failure");
+                    warn!("Authentication failure");
                 },
 
             },
-        Err(e) => println!("Can not clone stream: {}", e),
+        Err(e) => warn!("Can not clone stream: {}", e),
     }
 }
 
-fn auth_client<I>(mut stream: TcpStream) -> Option<Client> {
+fn auth_client<I>(mut stream: TcpStream) -> Option<(Client, Blowfish)> {
     let mut reader = get_buf_reader(stream.try_clone().unwrap());
     let challenge = generate_challenge();
     let mut reader_buffer = String::new();
@@ -109,18 +110,18 @@ fn auth_client<I>(mut stream: TcpStream) -> Option<Client> {
         Ok(_) => 
         {
             match reader.read_line(&mut reader_buffer) {
-                Ok(n) => info!("Read {} as identity line", n),
+                Ok(n) => info!("Read {} bytes as identity line", n),
                 Err(e) => warn!("Could not read identity: {}", e),
             }
             let client_identity_pretended = get_client_local_identity(remove_newline(reader_buffer.clone()));
             info!("Identity pretended: {}", client_identity_pretended.clone().get_name());
 
-            let challenge_response_exp: Challenge = client_expected_challenge_response(client_identity_pretended.clone(), challenge);
+            let (client_bf, challenge_response_exp) = client_expected_challenge_response(client_identity_pretended.clone(), challenge);
             info!("Challenge expected: {:?}", challenge_response_exp.clone());
 
             reader_buffer.clear();
             match reader.read_line(&mut reader_buffer) {
-                Ok(n) => info!("Read {} as challenge response line", n),
+                Ok(n) => info!("Read {} bytes as challenge response line", n),
                 Err(e) => warn!("Could not read challenge response: {}", e),
             }
             let challenge_response_buf: Challenge =
@@ -131,26 +132,30 @@ fn auth_client<I>(mut stream: TcpStream) -> Option<Client> {
             if challenge_response_buf == challenge_response_exp {
                 info!("Client authenticated");
                 stream.write("Client authenticated\n".as_bytes()).expect("Error");
-                Some::<Client>(client_identity_pretended)
+                Some::<(Client, Blowfish)>((client_identity_pretended, client_bf))
             } else {
                 info!("Authentication failure. Aborting.");
                 let buf = "Authentication failure. Aborting.\n".to_string();
                 match stream.write(buf.as_bytes()) {
-                    Ok(_) => println!("NAUTH sent"),
-                    Err(e) => println!("NAUTH not sent: {}", e),
+                    Ok(_) => info!("NAUTH sent"),
+                    Err(e) => warn!("NAUTH not sent: {}", e),
                 };
                 None
             }
         }
         Err(e) => {
-            println!("ID_REQ not sent: {}", e);
+            warn!("ID_REQ not sent: {}", e);
             None
         }
     }
 }
 
-fn client_expected_challenge_response<I>(i: I, challenge: Challenge) -> Challenge where I: Identity{
-    challenge
+fn client_expected_challenge_response<I>(i: I, challenge: Challenge) -> (Blowfish, Challenge) where I: Identity{
+    let bf = get_cipher(i.get_secret());
+    let in_buf = GenericArray::from_slice(&challenge);
+    let mut out_buf = GenericArray::new();
+    bf.encrypt_block(&in_buf , &mut out_buf);
+    (bf, out_buf.to_vec())
 }
 
 fn generate_challenge() -> Challenge {
@@ -164,6 +169,7 @@ fn generate_challenge() -> Challenge {
 }
 
 fn send_id_request(mut stream: TcpStream, challenge: Challenge) -> std::io::Result<usize> {
+    info!("Challenge proposed: {:?}", challenge.clone());
     let buf = "Please identify yourself\n".to_string()
         + &"Challenge is: \""
         + &base64::encode(&challenge)
@@ -172,7 +178,7 @@ fn send_id_request(mut stream: TcpStream, challenge: Challenge) -> std::io::Resu
 }
 
 fn get_client_local_identity(s: String) -> Client {
-    Client::new(s.clone(), s) 
+    Client::new(s.clone(), get_config_client_key(s))
 }
 
 fn remove_newline(s: String) -> String {
@@ -181,17 +187,25 @@ fn remove_newline(s: String) -> String {
     my_s
 }
 
-fn get_cipher() -> Blowfish {
-
-    let key = vec![2, 0, 0, 0];
+fn get_cipher(key: BlowfishKey) -> Blowfish {
     Blowfish::new(key.as_slice())
 }
 
 fn start_logger() {
-    env_logger::init();
-    info!("Logger started");
+    match env_logger::init() {
+         Ok(()) => info!("Logger started"),
+         Err(e) => print!("Error during logger initialisation. Reason: {}", e),
+    }
 }
 
 fn get_buf_reader(stream: TcpStream) -> BufReader<TcpStream> {
     BufReader::new(stream)
+}
+
+fn get_config_client_key(client_name: String) -> BlowfishKey {
+    vec![3, 0, 0, 0]
+}
+
+fn get_config_local_key() -> BlowfishKey {
+    vec![2, 0, 0, 0]
 }
