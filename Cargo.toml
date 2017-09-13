@@ -5,5 +5,8 @@ authors = ["Martin Vassor <martin.vassor@epfl.ch>"]
 
 [dependencies]
 base64 = "0.6.0"
-log = "0.3"
-env_logger = "0.3"
+log = "*"
+env_logger = "*"
+blowfish = "0.2.1"
+block-cipher-trait = "0.2.0"
+generic-array = "0.5.1"

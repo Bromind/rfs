@@ -7,7 +7,16 @@ extern crate log;
 extern crate env_logger;
 extern crate base64;
 
+extern crate generic_array;
+use generic_array::GenericArray;
 
+extern crate blowfish;
+use blowfish::Blowfish;
+
+extern crate block_cipher_trait;
+use block_cipher_trait::{BlockCipher, BlockCipherVarKey};
+
+type BlowfishKey = Vec<u8>;
 type Challenge = Vec<u8>;
 
 fn main() {
@@ -16,11 +25,14 @@ fn main() {
 }
 
 fn start_logger() {
-    env_logger::init();
-    info!("Logger started");
+    match env_logger::init() {
+        Ok(()) => info!("Logger started"),
+        Err(e) => print!("Error during logger initialisation. Reason: {}", e),
+    }
 }
 
 fn connect_server() -> Option<TcpStream> {
+    let bf = get_cipher(get_client_key());
     match TcpStream::connect(get_address()) {
         Ok(stream) => {
             info!("Connection successful");
@@ -28,7 +40,8 @@ fn connect_server() -> Option<TcpStream> {
                 Some(c) => {
                     info!("Challenge is: {:?}", c);
                     send_identity(stream.try_clone().unwrap(), String::from("Identity"));
-                    send_challenge_response(stream.try_clone().unwrap(), c);
+                    let c_resp = get_challenge_response(c, bf);
+                    send_challenge_response(stream.try_clone().unwrap(), c_resp);
                 },
                 None => warn!("Could not get challenge"),
             }
@@ -80,6 +93,13 @@ fn send_challenge_response(mut stream: TcpStream, c: Challenge) {
     stream.write("\n".as_bytes());
 }
 
+fn get_challenge_response(c: Challenge, b: Blowfish) -> Challenge {
+    let mut out_buf = GenericArray::new();
+    let in_buf = GenericArray::from_slice(&c);
+    b.encrypt_block(&in_buf, &mut out_buf);
+    out_buf.to_vec()
+}
+
 fn get_buf_reader(stream: TcpStream) -> BufReader<TcpStream> {
     BufReader::new(stream)
 }
@@ -89,4 +109,12 @@ fn stream_read_line(stream: TcpStream) -> String {
     let mut to_ret = String::new();
     buf.read_line(&mut to_ret).unwrap();
     to_ret
+}
+
+fn get_cipher(key: BlowfishKey) -> Blowfish {
+    Blowfish::new(key.as_slice())
+}
+
+fn get_client_key() -> BlowfishKey {
+    vec![3, 0, 0, 0]
 }
