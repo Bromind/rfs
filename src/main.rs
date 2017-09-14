@@ -1,7 +1,6 @@
 use std::net::TcpStream;
 use std::io::Write;
 use std::io::{BufReader, BufRead};
-use std::error::Error;
 
 #[macro_use]
 extern crate log;
@@ -23,133 +22,17 @@ type Challenge = Vec<u8>;
 extern crate bincode;
 #[macro_use]
 extern crate serde_derive;
-use bincode::{serialize, deserialize, Bounded};
 
-#[derive(Serialize, Deserialize, Debug)]
-struct WriteFile {
-    content: Vec<u8>,
-    position: u64,
-    filename: Vec<u8>,
-}
+pub mod message;
 
-trait Message: Sized {
-    fn serialize(&self) -> Option<Vec<u8>>;
-    fn deserialize(slice: &[u8]) -> Option<Self>;
-}
-
-impl WriteFile {
-    fn new(content: Vec<u8>, position: u64, name: &str) -> Self {
-        WriteFile {content: content, position: position, filename: name.as_bytes().to_vec()}
-    }
-}
-
-impl Message for WriteFile {
-    fn serialize (&self) -> Option<Vec<u8>> {
-        let limit = Bounded(512);
-        match serialize(&self, limit) {
-            Ok(vec) => Some(vec),
-            Err(e) => {
-                warn!("Could not serialize WriteFile message. Reason: {}", e);
-                None
-            },
-        }
-    }
-
-    fn deserialize(slice: &[u8]) -> Option<Self> {
-        match deserialize(slice) {
-            Ok(wf) => Some(wf),
-            Err(e) => {
-                warn!("Could not deserialize WriteFile message. Reason: {}", e);
-                None
-            },
-        }
-    }
-}
-
-#[derive(Debug)]
-struct SignedMessage {
-    serializedMessage: Vec<u8>,
-    signature: Vec<u8>,
-}
-
-trait MessageSigner {
-    fn sign<M: Message>(&self, message: M) -> Option<SignedMessage>;
-    fn assert(&self, message: SignedMessage) -> Result<(), MessageSignerError>;
-}
-
-#[derive(Debug)]
-enum MessageSignerErrorKind {
-    SignatureDontMatch,
-}
-
-#[derive(Debug)]
-struct MessageSignerError {
-    kind: MessageSignerErrorKind,
-}
-
-impl std::fmt::Display for MessageSignerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Message Signer Error: {:?}", self.kind)
-    }
-}
-
-impl Error for MessageSignerError {
-    fn description(&self) -> &str {
-        match self.kind {
-            MessageSignerErrorKind::SignatureDontMatch => "The provided signature and the computed signature don't match",
-        }
-    }
-}
-
-struct BlowfishSigner {
-    bf: Blowfish,
-}
-
-impl BlowfishSigner {
-    fn new(bfk: BlowfishKey) -> Self {
-        Self {bf: Blowfish::new(bfk.as_slice())}
-    }
-}
-
-impl MessageSigner for BlowfishSigner {
-    fn sign<M: Message>(&self, message: M) -> Option<SignedMessage> {
-        match message.serialize() {
-            Some(v) => {
-                let mut xor: u8 = 0;
-                for byte in v.clone() {
-                    xor = xor ^ byte;
-                    // TODO: Use more than 1 byte
-                }
-                let in_buf = GenericArray::from_slice(&vec![xor, 0, 0, 0, 0, 0, 0, 0]);
-                let mut out_buf = GenericArray::new();
-                self.bf.encrypt_block(&in_buf, &mut out_buf);
-                Some(SignedMessage {serializedMessage: v, signature: out_buf.to_vec()})
-            },
-            None => None,
-        }
-    }
-
-    fn assert(&self, message: SignedMessage) -> Result<(), MessageSignerError> {
-        let mut xor: u8 = 0;
-        for byte in message.serializedMessage {
-            xor = xor ^ byte;
-        }
-        let in_buf = GenericArray::from_slice(&vec![xor, 0, 0, 0, 0, 0, 0, 0]);
-        let mut out_buf = GenericArray::new();
-        self.bf.encrypt_block(&in_buf, &mut out_buf);
-        if out_buf.to_vec() == message.signature {
-            Ok(())
-        } else {
-            Err(MessageSignerError {kind: MessageSignerErrorKind::SignatureDontMatch})
-        }
-    }
-}
+pub mod message_signer;
 
 fn main() {
     start_logger();
     connect_server();
 
-    let message = WriteFile::new(vec![1, 2, 3, 4, 5], 0, "filename");
+    use message_signer::{BlowfishSigner, MessageSigner};
+    let message = message::WriteFile::new(vec![1, 2, 3, 4, 5], 0, "filename");
     let bfs = BlowfishSigner::new(get_client_key());
     match bfs.sign(message) {
         Some(sm) => {
@@ -158,7 +41,7 @@ fn main() {
                 Err(e) => print!("{}", e),
             }
         },
-        None => {panic!(); ()},
+        None => {panic!()},
     };
 }
 
