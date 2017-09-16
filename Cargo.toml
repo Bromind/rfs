@@ -1,15 +1,20 @@
 [package]
-name = "rfs_client"
+name = "rfs"
 version = "0.1.0"
 authors = ["Martin Vassor <martin.vassor@epfl.ch>"]
 
 [dependencies]
 base64 = "0.6.0"
-log = "*"
-env_logger = "*"
-blowfish = "0.2.1"
-block-cipher-trait = "0.2.0"
-generic-array = "0.5.1"
 bincode = "*"
-serde_derive = "*"
+block-cipher-trait = "0.2.0"
+blowfish = "0.2.1"
+env_logger = "*"
+generic-array = "0.5.1"
+log = "*"
+rand = "0.3"
 serde = "*"
+serde_derive = "*"
+
+[lib]
+name = "rfs"
+path = "src/lib.rs"

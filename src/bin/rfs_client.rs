@@ -1,18 +1,8 @@
+extern crate rfs;
+use rfs::{message, message_signer, rfs_client, rfs_common};
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate base64;
-extern crate generic_array;
-extern crate blowfish;
-extern crate block_cipher_trait;
-extern crate bincode;
-#[macro_use]
-extern crate serde_derive;
-
-pub mod message;
-pub mod message_signer;
-pub mod rfs_client;
-pub mod rfs_common;
 
 fn main() {
     start_logger();
@@ -40,15 +30,14 @@ fn get_client_key() -> rfs_common::BlowfishKey {
     vec![3, 0, 0, 0]
 }
 
+fn get_address() -> String {
+    info!("Address is localhost:4242");
+    String::from("localhost:4242")
+}
+
 fn start_logger() {
     match env_logger::init() {
         Ok(()) => info!("Logger started"),
         Err(e) => print!("Error during logger initialisation. Reason: {}", e),
     }
 }
-
-fn get_address() -> String {
-    info!("Address is localhost:4242");
-    String::from("localhost:4242")
-}
-
