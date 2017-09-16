@@ -1,7 +1,7 @@
 use std::net::TcpStream;
 use std::net::TcpListener;
 use std::io::Write;
-use std::io::{BufReader, BufRead};
+use std::io::BufRead;
 
 extern crate rand;
 
@@ -21,7 +21,10 @@ extern crate blowfish;
 use blowfish::Blowfish;
 
 extern crate block_cipher_trait;
-use block_cipher_trait::{BlockCipher, BlockCipherVarKey};
+use block_cipher_trait::BlockCipher;
+
+extern crate rfs;
+use rfs::rfs_common::{get_cipher, get_buf_reader};
 
 trait Identity: Clone {
     fn get_secret(self) -> BlowfishKey;
@@ -187,19 +190,11 @@ fn remove_newline(s: String) -> String {
     my_s
 }
 
-fn get_cipher(key: BlowfishKey) -> Blowfish {
-    Blowfish::new(key.as_slice())
-}
-
 fn start_logger() {
     match env_logger::init() {
          Ok(()) => info!("Logger started"),
          Err(e) => print!("Error during logger initialisation. Reason: {}", e),
     }
-}
-
-fn get_buf_reader(stream: TcpStream) -> BufReader<TcpStream> {
-    BufReader::new(stream)
 }
 
 fn get_config_client_key(client_name: String) -> BlowfishKey {
