@@ -2,12 +2,13 @@
 //! is just a list of clients and servers with relevant details (keys, address, etc..).
 
 use base64;
-use rfs_common::{Named, BlowfishKey, get_buf_reader};
+use rfs_common::{Identity, Named, BlowfishKey, get_buf_reader};
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 use std::fs::File;
 use std::io::BufRead;
 use std::path::Path;
+use std::error::Error;
 
 /// Fields of the config, either a client or a server.
 #[derive(Clone)]
@@ -20,8 +21,17 @@ impl Named for Field {
     type Name = String;
     fn get_name(self) -> Self::Name {
         match self {
-            Field::Client{name, key:_} => name.clone(),
+            Field::Client{name, key:_} => name,
             Field::Server{name, key:_, address:_, port:_} => name,
+        }
+    }
+}
+
+impl Identity for Field {
+    fn get_secret(self) -> BlowfishKey {
+        match self {
+            Field::Client{name:_, key} => key,
+            Field::Server{name:_, key, address:_, port:_} => key,
         }
     }
 }
@@ -30,11 +40,13 @@ impl Named for Field {
 pub trait Config {
     type Name;
     type Field: Named;
-    fn get_from_name(&self, name: Self::Name) -> Option<&Self::Field>;
+    type ErrorType: Error;
+    fn get_from_name(&self, name: Self::Name) -> Result<&Self::Field, Self::ErrorType>;
     fn add_field(&mut self, f: Self::Field) -> Result<(), ()>;
 }
 
 /// A configuration for the RFS.
+#[derive(Clone)]
 pub struct RfsConfig {
     fields: HashMap<String, Field>,
 }
@@ -49,9 +61,10 @@ impl RfsConfig {
 impl Config for RfsConfig {
     type Name = String;
     type Field = Field;
+    type ErrorType = RfsConfigError;
 
-    fn get_from_name(&self, name: String) -> Option<&Field> {
-        self.fields.get(&name) 
+    fn get_from_name(&self, name: String) -> Result<&Field, RfsConfigError> {
+        self.fields.get(&name).ok_or(RfsConfigError{kind: RfsConfigErrorKind::NoSuchName{name: name}})
     }
 
     fn add_field(&mut self, f: Field) -> Result<(), ()> {
@@ -109,6 +122,32 @@ impl <T: AsRef<Path> + Display + Clone> From<T> for RfsConfig {
             Err(e) => {
                 warn!("Could not open file {}. Reason: {}", p, e);
                 RfsConfig::new()
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+enum RfsConfigErrorKind {
+    NoSuchName{name: String},
+}
+
+#[derive(Debug)]
+pub struct RfsConfigError {
+    kind: RfsConfigErrorKind,
+}
+
+impl Display for RfsConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "RfsConfig Error: {:?}", self.kind)
+    }
+}
+
+impl Error for RfsConfigError {
+    fn description(&self) -> &str {
+        match self.kind {
+            RfsConfigErrorKind::NoSuchName{name:_} => {
+                "There is no client or serveur with such name in the config."
             },
         }
     }

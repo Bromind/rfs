@@ -4,6 +4,7 @@ use blowfish::Blowfish;
 use block_cipher_trait::BlockCipherVarKey;
 use std::io::BufReader;
 use std::io::Read;
+use config::Field;
 
 /// BlowfishKey type.
 pub type BlowfishKey = Vec<u8>;
@@ -21,9 +22,8 @@ pub fn get_buf_reader<R: Read>(stream: R) -> BufReader<R> {
 }
 
 /// Identity trait. Encapsulate a name and a secret.
-pub trait Identity: Clone {
+pub trait Identity: Clone + Named<Name=String> {
     fn get_secret(self) -> BlowfishKey;
-    fn get_name(self) -> String;
 }
 
 /// A client identity.
@@ -39,10 +39,14 @@ impl Client {
     }
 }
 
-impl Identity for Client {
+impl Named for Client {
+    type Name = String;
     fn get_name(self) -> String {
         self.name
     }
+}
+
+impl Identity for Client {
     fn get_secret(self) -> BlowfishKey {
         self.pass
     }
@@ -54,3 +58,10 @@ pub trait Named {
     fn get_name(self) -> Self::Name;
 }
 
+/// Print a welcome on the `info` log.
+pub fn welcome(s: Field) {
+    match s {
+        Field::Server{name, key:_, address, port} => info!("Welcome on server {} at {}", name, address + ":" + &port),
+        Field::Client{name, key: _} => info!("Welcome on client {}", name),
+    }
+}
