@@ -2,8 +2,8 @@
 
 use blowfish::Blowfish;
 use block_cipher_trait::BlockCipherVarKey;
-use std::net::TcpStream;
 use std::io::BufReader;
+use std::io::Read;
 
 /// BlowfishKey type.
 pub type BlowfishKey = Vec<u8>;
@@ -16,7 +16,7 @@ pub fn get_cipher(key: BlowfishKey) -> Blowfish {
 }
 
 /// Returns a BufReader given a TcpStream.
-pub fn get_buf_reader(stream: TcpStream) -> BufReader<TcpStream> {
+pub fn get_buf_reader<R: Read>(stream: R) -> BufReader<R> {
     BufReader::new(stream)
 }
 
@@ -47,3 +47,10 @@ impl Identity for Client {
         self.pass
     }
 }
+
+/// A trait for named things.
+pub trait Named {
+    type Name;
+    fn get_name(self) -> Self::Name;
+}
+

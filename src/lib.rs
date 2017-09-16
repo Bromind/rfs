@@ -15,3 +15,4 @@ pub mod message_signer;
 pub mod rfs_common;
 pub mod rfs_client;
 pub mod rfs_server;
+pub mod config;
