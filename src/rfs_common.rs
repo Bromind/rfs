@@ -19,3 +19,31 @@ pub fn get_cipher(key: BlowfishKey) -> Blowfish {
 pub fn get_buf_reader(stream: TcpStream) -> BufReader<TcpStream> {
     BufReader::new(stream)
 }
+
+/// Identity trait. Encapsulate a name and a secret.
+pub trait Identity: Clone {
+    fn get_secret(self) -> BlowfishKey;
+    fn get_name(self) -> String;
+}
+
+/// A client identity.
+#[derive(Clone)]
+pub struct Client {
+    pass: BlowfishKey,
+    name: String,
+}
+
+impl Client {
+    pub fn new(n: String, p: BlowfishKey) -> Client {
+        Client {name: n, pass: p}
+    }
+}
+
+impl Identity for Client {
+    fn get_name(self) -> String {
+        self.name
+    }
+    fn get_secret(self) -> BlowfishKey {
+        self.pass
+    }
+}
