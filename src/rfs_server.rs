@@ -3,7 +3,7 @@ use block_cipher_trait::BlockCipher;
 use blowfish::Blowfish;
 use generic_array::GenericArray;
 use rfs_common::*;
-use config::{RfsConfig, Config, RfsConfigError};
+use config::{RfsConfig, Config};
 use config::Field;
 use std::io::BufRead;
 use std::io::Result as IoResult;
@@ -84,8 +84,17 @@ impl RfsServer {
 
         }
     }
+    /*
+    fn auth_client<I: Identity<Name = String>>(
+        &self,
+        mut stream: TcpStream,
+    ) -> Option<(&I, Blowfish)> {
+    */
+    fn auth_client<I: Identity<Name = String>>(
+        &self,
+        mut stream: TcpStream,
+    ) -> Option<(&Field, Blowfish)> {
 
-    fn auth_client<I>(&self, mut stream: TcpStream) -> Option<(Client, Blowfish)> {
         let mut reader = get_buf_reader(stream.try_clone().unwrap());
         let challenge = generate_challenge();
         let mut reader_buffer = String::new();
@@ -96,16 +105,18 @@ impl RfsServer {
                     Ok(n) => info!("Read {} bytes as identity line", n),
                     Err(e) => warn!("Could not read identity: {}", e),
                 }
-                match self.get_identity(remove_newline(reader_buffer.clone())) {
-                    Some(client_identity_pretended) => {
+                match self.config.get_from_name(
+                    remove_newline(reader_buffer.clone()),
+                ) {
+                    Ok(client_identity_pretended) => {
                         info!(
                             "Identity pretended: {}",
-                            client_identity_pretended.clone().get_name()
+                            client_identity_pretended.get_name()
                         );
 
                         let (client_bf, challenge_response_exp) =
                             client_expected_challenge_response(
-                                client_identity_pretended.clone(),
+                                client_identity_pretended,
                                 challenge,
                             );
                         info!("Challenge expected: {:?}", challenge_response_exp.clone());
@@ -128,7 +139,7 @@ impl RfsServer {
                             stream.write("Client authenticated\n".as_bytes()).expect(
                                 "Error",
                             );
-                            Some::<(Client, Blowfish)>((client_identity_pretended, client_bf))
+                            Some((client_identity_pretended, client_bf))
                         } else {
                             info!("Authentication failure. Aborting.");
                             let buf = "Authentication failure. Aborting.\n".to_string();
@@ -139,7 +150,7 @@ impl RfsServer {
                             None
                         }
                     }
-                    None => None, 
+                    Err(_) => None, 
                 }
             }
             Err(e) => {
@@ -150,29 +161,11 @@ impl RfsServer {
     }
 
 
-    fn get_config_key(&self, name: String) -> Result<BlowfishKey, RfsConfigError> {
-        match self.config.get_from_name(name) {
-            Ok(f) => Ok(f.clone().get_secret()),
-            Err(e) => Err(e),
-        }
-    }
-
     fn send_id_request(&self, mut stream: TcpStream, challenge: Challenge) -> IoResult<usize> {
         info!("Challenge proposed: {:?}", challenge.clone());
         let buf = "Please identify yourself\n".to_string() + &"Challenge is: \"" +
             &base64::encode(&challenge) + &"\"\n";
         stream.write(buf.as_bytes())
-    }
-
-    // TODO: Return Option<I> where I: Identity
-    fn get_identity(&self, s: String) -> Option<Client> {
-        match self.get_config_key(s.clone()) {
-            Ok(key) => Some(Client::new(s, key)), 
-            Err(e) => {
-                warn!("Can not get client identity. Reason: {}", e);
-                None
-            }
-        }
     }
 }
 
@@ -192,7 +185,7 @@ fn generate_challenge() -> Challenge {
     buf.to_vec()
 }
 
-fn client_expected_challenge_response<I>(i: I, challenge: Challenge) -> (Blowfish, Challenge)
+fn client_expected_challenge_response<I>(i: &I, challenge: Challenge) -> (Blowfish, Challenge)
 where
     I: Identity,
 {

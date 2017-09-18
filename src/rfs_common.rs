@@ -12,7 +12,7 @@ pub type BlowfishKey = Vec<u8>;
 pub type Challenge = Vec<u8>;
 
 /// Returns a cipher given a key.
-pub fn get_cipher(key: BlowfishKey) -> Blowfish {
+pub fn get_cipher(key: &BlowfishKey) -> Blowfish {
     Blowfish::new(key.as_slice())
 }
 
@@ -22,40 +22,40 @@ pub fn get_buf_reader<R: Read>(stream: R) -> BufReader<R> {
 }
 
 /// Identity trait. Encapsulate a name and a secret.
-pub trait Identity: Clone + Named<Name = String> {
-    fn get_secret(self) -> BlowfishKey;
+pub trait Identity: Clone + Named<Name = String> + Sized {
+    fn get_secret(&self) -> &BlowfishKey;
 }
 
 /// A client identity.
 #[derive(Clone)]
 pub struct Client {
-    pass: BlowfishKey,
+    key: BlowfishKey,
     name: String,
 }
 
 impl Client {
-    pub fn new(n: String, p: BlowfishKey) -> Client {
-        Client { name: n, pass: p }
+    pub fn new(n: String, k: BlowfishKey) -> Client {
+        Client { name: n, key: k }
     }
 }
 
 impl Named for Client {
     type Name = String;
-    fn get_name(self) -> String {
-        self.name
+    fn get_name(&self) -> &String {
+        &self.name
     }
 }
 
 impl Identity for Client {
-    fn get_secret(self) -> BlowfishKey {
-        self.pass
+    fn get_secret(&self) -> &BlowfishKey {
+        &self.key
     }
 }
 
 /// A trait for named things.
 pub trait Named {
     type Name;
-    fn get_name(self) -> Self::Name;
+    fn get_name(&self) -> &Self::Name;
 }
 
 /// Print a welcome on the `info` log.

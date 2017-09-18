@@ -24,11 +24,11 @@ pub enum Field {
 
 impl Named for Field {
     type Name = String;
-    fn get_name(self) -> Self::Name {
+    fn get_name(&self) -> &Self::Name {
         match self {
-            Field::Client { name, key: _ } => name,
-            Field::Server {
-                name,
+            &Field::Client { ref name, key: _ } => name,
+            &Field::Server {
+                ref name,
                 key: _,
                 address: _,
                 port: _,
@@ -38,12 +38,12 @@ impl Named for Field {
 }
 
 impl Identity for Field {
-    fn get_secret(self) -> BlowfishKey {
+    fn get_secret(&self) -> &BlowfishKey {
         match self {
-            Field::Client { name: _, key } => key,
-            Field::Server {
+            &Field::Client { name: _, ref key } => key,
+            &Field::Server {
                 name: _,
-                key,
+                ref key,
                 address: _,
                 port: _,
             } => key,
@@ -71,6 +71,22 @@ impl RfsConfig {
     pub fn new() -> Self {
         RfsConfig { fields: HashMap::new() }
     }
+
+    pub fn get_server_address(&self, server_name: String) -> Option<String> {
+        match self.get_from_name(server_name) {
+            Ok(&Field::Client { name: _, key: _ }) => None,
+            Ok(&Field::Server {
+                   name: _,
+                   key: _,
+                   ref address,
+                   ref port,
+               }) => Some(address.clone() + ":" + &port),
+            Err(e) => {
+                warn!{"Can not retrieve server address. Reason: {}", e};
+                None
+            }
+        }
+    }
 }
 
 impl Config for RfsConfig {
@@ -85,7 +101,7 @@ impl Config for RfsConfig {
     }
 
     fn add_field(&mut self, f: Field) -> Result<(), ()> {
-        match self.fields.insert(f.clone().get_name(), f) {
+        match self.fields.insert(f.get_name().clone(), f) {
             Some(_) => Err(()),
             None => Ok(()),
         }
