@@ -22,7 +22,7 @@ pub fn get_buf_reader<R: Read>(stream: R) -> BufReader<R> {
 }
 
 /// Identity trait. Encapsulate a name and a secret.
-pub trait Identity: Clone + Named<Name=String> {
+pub trait Identity: Clone + Named<Name = String> {
     fn get_secret(self) -> BlowfishKey;
 }
 
@@ -35,7 +35,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(n: String, p: BlowfishKey) -> Client {
-        Client {name: n, pass: p}
+        Client { name: n, pass: p }
     }
 }
 
@@ -61,7 +61,12 @@ pub trait Named {
 /// Print a welcome on the `info` log.
 pub fn welcome(s: Field) {
     match s {
-        Field::Server{name, key:_, address, port} => info!("Welcome on server {} at {}", name, address + ":" + &port),
-        Field::Client{name, key: _} => info!("Welcome on client {}", name),
+        Field::Server {
+            name,
+            key: _,
+            address,
+            port,
+        } => info!("Welcome on server {} at {}", name, address + ":" + &port),
+        Field::Client { name, key: _ } => info!("Welcome on client {}", name),
     }
 }

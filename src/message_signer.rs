@@ -50,7 +50,9 @@ impl fmt::Display for MessageSignerError {
 impl Error for MessageSignerError {
     fn description(&self) -> &str {
         match self.kind {
-            MessageSignerErrorKind::SignatureDontMatch => "The provided signature and the computed signature don't match",
+            MessageSignerErrorKind::SignatureDontMatch => {
+                "The provided signature and the computed signature don't match"
+            }
         }
     }
 }
@@ -63,7 +65,7 @@ pub struct BlowfishSigner {
 impl BlowfishSigner {
     /// Create a `BlowfishSigner` for the given key.
     pub fn new(bfk: BlowfishKey) -> Self {
-        Self {bf: Blowfish::new(bfk.as_slice())}
+        Self { bf: Blowfish::new(bfk.as_slice()) }
     }
 }
 
@@ -79,8 +81,11 @@ impl MessageSigner for BlowfishSigner {
                 let in_buf = GenericArray::from_slice(&vec![xor, 0, 0, 0, 0, 0, 0, 0]);
                 let mut out_buf = GenericArray::new();
                 self.bf.encrypt_block(&in_buf, &mut out_buf);
-                Some(SignedMessage {serialized_message: v, signature: out_buf.to_vec()})
-            },
+                Some(SignedMessage {
+                    serialized_message: v,
+                    signature: out_buf.to_vec(),
+                })
+            }
             None => None,
         }
     }
@@ -96,7 +101,9 @@ impl MessageSigner for BlowfishSigner {
         if out_buf.to_vec() == message.signature {
             Ok(())
         } else {
-            Err(MessageSignerError {kind: MessageSignerErrorKind::SignatureDontMatch})
+            Err(MessageSignerError {
+                kind: MessageSignerErrorKind::SignatureDontMatch,
+            })
         }
     }
 }

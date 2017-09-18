@@ -10,13 +10,16 @@ fn main() {
     let config = RfsConfig::from("assets/rfs_config");
     match RfsServer::new(String::from("srv1"), config) {
         Some(s) => s.listen(),
-        None => {print!("Error"); ()},
+        None => {
+            print!("Error");
+            ()
+        }
     }
 }
 
 fn start_logger() {
     match env_logger::init() {
-         Ok(()) => info!("Logger started"),
-         Err(e) => print!("Error during logger initialisation. Reason: {}", e),
+        Ok(()) => info!("Logger started"),
+        Err(e) => print!("Error during logger initialisation. Reason: {}", e),
     }
 }

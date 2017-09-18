@@ -7,7 +7,11 @@ extern crate env_logger;
 fn main() {
     start_logger();
 
-    match rfs_client::RfsClientSession::new(get_address(), "client".to_lowercase(), get_client_key()) {
+    match rfs_client::RfsClientSession::new(
+        get_address(),
+        "client".to_lowercase(),
+        get_client_key(),
+    ) {
         Some(c) => c.disconnect().expect("Disconnection failed"),
         None => (),
     };
@@ -21,8 +25,8 @@ fn main() {
                 Ok(()) => print!("ok"),
                 Err(e) => print!("{}", e),
             }
-        },
-        None => {panic!()},
+        }
+        None => panic!(),
     };
 }
 

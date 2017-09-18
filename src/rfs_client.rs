@@ -15,11 +15,18 @@ pub struct RfsClientSession {
     client_key: BlowfishKey,
 }
 
-impl RfsClientSession{
+impl RfsClientSession {
     pub fn new(address: String, name: String, key: BlowfishKey) -> Option<Self> {
         match connect_server(address, key.clone()) {
-            Some(stream) => Some(RfsClientSession {stream: stream, client_name: name, client_key: key}),
-            None => {warn!("Could not create RfsClientSession"); None},
+            Some(stream) => Some(RfsClientSession {
+                stream: stream,
+                client_name: name,
+                client_key: key,
+            }),
+            None => {
+                warn!("Could not create RfsClientSession");
+                None
+            }
         }
     }
 
@@ -34,33 +41,33 @@ fn connect_server(address: String, key: BlowfishKey) -> Option<TcpStream> {
     match TcpStream::connect(address) {
         Ok(stream) => {
             info!("Connection successful");
-            match get_challenge(stream.try_clone().unwrap()){
+            match get_challenge(stream.try_clone().unwrap()) {
                 Some(c) => {
                     info!("Challenge is: {:?}", c);
                     send_identity(stream.try_clone().unwrap(), String::from("Identity"));
                     let c_resp = get_challenge_response(c, bf);
                     send_challenge_response(stream.try_clone().unwrap(), c_resp);
                     Some(stream)
-                },
+                }
                 None => {
                     warn!("Could not get challenge");
                     None
-                },
+                }
             }
-        },
+        }
         Err(e) => {
             warn!("Error connecting to server. Reason: {}", e);
             None
-        },
+        }
     }
 }
 
 
 fn get_challenge(stream: TcpStream) -> Option<Challenge> {
     let mut buf = get_buf_reader(stream);
-    let mut challenge_line = String::new(); 
+    let mut challenge_line = String::new();
     buf.read_line(&mut challenge_line);
-    let mut challenge_line = String::new(); 
+    let mut challenge_line = String::new();
     buf.read_line(&mut challenge_line);
     let mut challenge_split = challenge_line.split('\"');
     challenge_split.next().unwrap();
@@ -70,11 +77,11 @@ fn get_challenge(stream: TcpStream) -> Option<Challenge> {
         Ok(v) => {
             info!("Challenge found: {:?}", v);
             Some(v)
-        },
+        }
         Err(e) => {
             warn!("Can not decode {}: {}", splitted_line_2, e);
             None
-        },
+        }
     }
 }
 
